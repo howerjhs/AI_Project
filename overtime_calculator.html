@@ -1,0 +1,243 @@
+
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>2026년 전산직 초과근무수당 계산기</title>
+    <style>
+        body {
+            font-family: 'Malgun Gothic', '맑은 고딕', sans-serif;
+            background-color: #f4f6f9;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        .calculator-container {
+            background-color: #ffffff;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+            max-width: 550px;
+            width: 100%;
+        }
+        h2 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 25px;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: bold;
+            color: #555;
+        }
+        select, input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 6px;
+            box-sizing: border-box;
+            font-size: 16px;
+        }
+        .info-text {
+            font-size: 12px;
+            color: #888;
+            margin-top: 4px;
+        }
+        button {
+            width: 100%;
+            padding: 12px;
+            background-color: #28a745;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            margin-top: 15px;
+            transition: background-color 0.2s;
+        }
+        button:hover {
+            background-color: #218838;
+        }
+        .result-container {
+            margin-top: 25px;
+            padding: 15px;
+            background-color: #e9ecef;
+            border-radius: 6px;
+            display: none;
+        }
+        .result-title {
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 10px;
+            border-bottom: 2px solid #28a745;
+            padding-bottom: 5px;
+        }
+        .result-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+            font-size: 15px;
+        }
+        .result-row.total {
+            font-weight: bold;
+            font-size: 18px;
+            color: #d9534f;
+            margin-top: 10px;
+            border-top: 1px dashed #ccc;
+            padding-top: 10px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="calculator-container">
+    <h2>2026 전산직 초과근무수당 계산기</h2>
+    
+    <div class="form-group">
+        <label for="grade">직급 구분 (전산직)</label>
+        <select id="grade" onchange="updateCalculatedRate()">
+            <option value="5">전산선임관 (5급)</option>
+            <option value="6">전산주사 (6급)</option>
+            <option value="7" selected>전산주사보 (7급)</option>
+            <option value="8">전산서기 (8급)</option>
+            <option value="9">전산서기보 (9급)</option>
+            <option value="custom">직접 단가 입력</option>
+        </select>
+    </div>
+
+    <div class="form-group" id="step-group">
+        <label for="step">호봉 선택</label>
+        <select id="step" onchange="updateCalculatedRate()">
+            <!-- Generating 1 to 31 steps dynamically via JS or hardcoded options -->
+        </select>
+    </div>
+
+    <div class="form-group" id="custom-rate-group" style="display: none;">
+        <label for="custom-rate">시간당 단가 직접 입력 (원)</label>
+        <input type="number" id="custom-rate" placeholder="직접 단가 입력" value="11000" oninput="updateCalculatedRate()">
+    </div>
+
+    <div class="form-group">
+        <label for="hourly-rate-display">적용 예정 시간당 단가</label>
+        <input type="text" id="hourly-rate-display" readonly style="background-color: #f1f3f5; font-weight: bold;">
+    </div>
+
+    <div class="form-group">
+        <label for="hours">평일 실제 초과근무 시간합계 (시간)</label>
+        <input type="number" id="hours" step="0.5" min="0" placeholder="예: 15" value="0">
+        <div class="info-text">* 평일 근무 시 일과 후 1일 1시간이 자동 공제된 시간의 총합을 입력하세요.</div>
+    </div>
+
+    <div class="form-group">
+        <label for="weekend-hours">휴일/주말 근무 인정 시간합계 (시간)</label>
+        <input type="number" id="weekend-hours" step="0.5" min="0" placeholder="예: 8" value="0">
+        <div class="info-text">* 주말/휴일은 공제 없이 적용됩니다 (일 최대 4시간, 월 한도 내).</div>
+    </div>
+
+    <button onclick="calculateOvertime()">수당 계산하기</button>
+
+    <div class="result-container" id="result">
+        <div class="result-title">계산 결과</div>
+        <div class="result-row">
+            <span>최종 적용 단가</span>
+            <span id="res-rate">0원</span>
+        </div>
+        <div class="result-row">
+            <span>총 합산 인정시간</span>
+            <span id="res-hours">0시간</span>
+        </div>
+        <div class="result-row total">
+            <span>지급 예상액</span>
+            <span id="res-amount">0원</span>
+        </div>
+    </div>
+</div>
+
+<script>
+    // 2026년 예상 기준 직급별/호봉별 기본 봉급표 모델링 및 초과수당 단가 공식 적용
+    // 초과근무수당 단가 기준: (해당 직급의 기준 호봉 봉급표 기준액 × 0.55 / 209) * 1.5
+    const baseSalaryTable = {
+        '5': { base: 2700000, stepIncrement: 95000 }, // 5급 대략적 기준
+        '6': { base: 2300000, stepIncrement: 82000 }, // 6급
+        '7': { base: 2100000, stepIncrement: 75000 }, // 7급
+        '8': { base: 1950000, stepIncrement: 68000 }, // 8급
+        '9': { base: 1850000, stepIncrement: 62000 }  // 9급
+    };
+
+    // 호봉 드롭다운 생성
+    const stepSelect = document.getElementById('step');
+    for (let i = 1; i <= 31; i++) {
+        let option = document.createElement('option');
+        option.value = i;
+        option.innerText = i + ' 호봉';
+        if (i === 5) option.selected = true; // 기본값 5호봉 설정
+        stepSelect.appendChild(option);
+    }
+
+    function getCalculatedRate() {
+        const grade = document.getElementById('grade').value;
+        if (grade === 'custom') {
+            return parseInt(document.getElementById('custom-rate').value) || 0;
+        }
+
+        const step = parseInt(document.getElementById('step').value) || 1;
+        const info = baseSalaryTable[grade];
+        
+        // 호봉에 따른 기본급 산출
+        const estimatedSalary = info.base + (step - 1) * info.stepIncrement;
+        
+        // 공무원 수당규정 기준 계산 공식 시뮬레이션 적용
+        // 시간당 단가 = 해당직급 기준액 (보통 해당직급 10호봉 수준의 봉급 등) * 0.55 / 209 * 1.5
+        // 직급 및 호봉 연동형으로 유연하게 설계
+        let hourlyRate = (estimatedSalary * 0.55 / 209) * 1.5;
+        
+        // 원단위 절사
+        return Math.floor(hourlyRate);
+    }
+
+    function updateCalculatedRate() {
+        const grade = document.getElementById('grade').value;
+        const customGroup = document.getElementById('custom-rate-group');
+        const stepGroup = document.getElementById('step-group');
+
+        if (grade === 'custom') {
+            customGroup.style.display = 'block';
+            stepGroup.style.display = 'none';
+        } else {
+            customGroup.style.display = 'none';
+            stepGroup.style.display = 'block';
+        }
+
+        const calculatedRate = getCalculatedRate();
+        document.getElementById('hourly-rate-display').value = calculatedRate.toLocaleString() + ' 원';
+    }
+
+    function calculateOvertime() {
+        const hourlyRate = getCalculatedRate();
+        const hours = parseFloat(document.getElementById('hours').value) || 0;
+        const weekendHours = parseFloat(document.getElementById('weekend-hours').value) || 0;
+
+        const totalHours = hours + weekendHours;
+        const totalAmount = Math.floor(totalHours * hourlyRate);
+
+        document.getElementById('res-rate').innerText = hourlyRate.toLocaleString() + ' 원';
+        document.getElementById('res-hours').innerText = totalHours.toFixed(1) + ' 시간';
+        document.getElementById('res-amount').innerText = totalAmount.toLocaleString() + ' 원';
+
+        document.getElementById('result').style.display = 'block';
+    }
+
+    // 최초 로드 시 단가 자동 업데이트
+    updateCalculatedRate();
+</script>
+
+</body>
+</html>
